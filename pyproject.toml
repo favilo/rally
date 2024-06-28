@@ -183,6 +183,7 @@ files = [
 module = [
     "esrally.utils.*",
 ]
+# Enable these when we are further along with type annotations
 # disallow_incomplete_defs = true
 # disallow_untyped_defs = true
 # this should be a copy of disabled_error_code from above
