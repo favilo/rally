@@ -97,12 +97,15 @@ s3 = [
 develop = [
     # s3
     "boto3==1.34.68",
+    "boto3-stubs[boto3]",
     # tests
     "ujson",
     "pytest==7.1.2",
     "pytest-benchmark==3.4.1",
     "pytest-asyncio==0.19.0",
     "pytest-httpserver==1.0.5",
+    "types-urllib3==1.26.25.14",
+    "types-psutil==5.9.4",
     "tox==3.25.0",
     "nox==2024.3.2",
     "sphinx==5.1.1",
@@ -112,6 +115,9 @@ develop = [
     "pylint==3.1.0",
     "trustme==0.9.0",
     "GitPython==3.1.30",
+    # formatting
+    "black==23.3.0",
+    "mypy==1.10.1",
 ]
 
 [project.scripts]
@@ -148,7 +154,7 @@ xfail_strict = true
 # types in config.Config methods while introducing configuration properties
 # (props). The error we are after here is "arg-type".
 [tool.mypy]
-python_version = 3.8
+python_version = "3.8"
 check_untyped_defs = true
 disable_error_code = [
     "assignment",
@@ -168,3 +174,40 @@ disable_error_code = [
     "union-attr",
     "var-annotated",
 ]
+files = [
+    "esrally/**/*.py",
+    # "tests/**/*.py",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "esrally.utils.*",
+]
+# disallow_incomplete_defs = true
+# disallow_untyped_defs = true
+# this should be a copy of disabled_error_code from above
+enable_error_code = [
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "call-overload",
+    "dict-item",
+    "import-not-found",
+    "import-untyped",
+    "index",
+    "list-item",
+    "misc",
+    "name-defined",
+    "operator",
+    "str-bytes-safe",
+    "syntax",
+    "union-attr",
+    "var-annotated",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "cpuinfo",
+    "google.*",
+]
+ignore_missing_imports = true

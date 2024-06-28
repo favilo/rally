@@ -18,6 +18,7 @@
 import os
 import shutil
 import sys
+from typing import Union, Type
 
 PLAIN = False
 QUIET = False
@@ -85,7 +86,7 @@ class RichFormat:
         return underline_symbol * len(message)
 
 
-format = PlainFormat
+format: Union[Type[PlainFormat], Type[RichFormat]] = PlainFormat
 
 
 def init(quiet=False, assume_tty=True):

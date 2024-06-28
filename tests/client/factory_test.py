@@ -29,7 +29,7 @@ import elasticsearch
 import pytest
 import trustme
 import urllib3.exceptions
-from elastic_transport import ApiResponseMeta
+from elastic_transport import ApiResponseMeta, HttpHeaders, NodeConfig
 from pytest_httpserver import HTTPServer
 
 from esrally import client, doc_link, exceptions
@@ -37,8 +37,15 @@ from esrally.client.asynchronous import RallyAsyncTransport
 from esrally.utils import console
 
 
+TEST_CONFIG = NodeConfig("http", "localhost", 9200, headers=HttpHeaders({"x-elastic-product": "Elasticsearch"}))
+
+
 def _api_error(status, message):
-    return elasticsearch.ApiError(message, ApiResponseMeta(status=status, http_version="1.1", headers={}, duration=0.0, node=None), None)
+    return elasticsearch.ApiError(
+        message,
+        ApiResponseMeta(status=status, http_version="1.1", headers=HttpHeaders({}), duration=0.0, node=TEST_CONFIG),
+        None,
+    )
 
 
 class TestEsClientFactory:
@@ -518,7 +525,7 @@ class TestRestLayer:
     def test_connection_protocol_error(self, es):
         es.cluster.health.side_effect = elasticsearch.ConnectionError(
             message="N/A",
-            errors=[urllib3.exceptions.ProtocolError("Connection aborted.")],
+            errors=(urllib3.exceptions.ProtocolError("Connection aborted."),),
         )
         with pytest.raises(
             exceptions.SystemSetupError,

@@ -15,9 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import abc
 import difflib
 import json
 import re
+from typing import (
+    Any,
+    AnyStr,
+    Callable,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Union,
+)
 
 from esrally.utils import io
 
@@ -25,7 +37,7 @@ from esrally.utils import io
 RE_JSON_ARRAY_START = re.compile(r'^(\s*\[\s*\])|(\s*\[\s*".*)')
 
 
-def csv_to_list(csv):
+def csv_to_list(csv: str) -> Collection[str]:
     if csv is None:
         return None
     if io.has_extension(csv, ".json"):
@@ -42,7 +54,7 @@ def csv_to_list(csv):
         return [e.strip() for e in csv.split(",")]
 
 
-def to_bool(v):
+def to_bool(v: Optional[str]) -> Optional[bool]:
     if v is None:
         return None
     elif v.lower() == "false":
@@ -53,7 +65,7 @@ def to_bool(v):
         raise ValueError("Could not convert value '%s'" % v)
 
 
-def to_none(v):
+def to_none(v: Optional[str]) -> None:
     if v is None:
         return None
     elif v.lower() == "none":
@@ -62,8 +74,8 @@ def to_none(v):
         raise ValueError("Could not convert value '%s'" % v)
 
 
-def kv_to_map(kvs):
-    def convert(v):
+def kv_to_map(kvs: List[str]) -> Mapping[str, Any]:
+    def convert(v: str) -> Union[str, int, float, bool, None]:
         # string (specified explicitly)
         if v.startswith("'"):
             return v[1:-1]
@@ -87,7 +99,8 @@ def kv_to_map(kvs):
             pass
 
         try:
-            return to_none(v)
+            # pylint: disable-next=func-returns-value
+            return to_none(v)  # type: ignore
         except ValueError:
             pass
 
@@ -102,7 +115,7 @@ def kv_to_map(kvs):
     return result
 
 
-def to_dict(arg, default_parser=kv_to_map):
+def to_dict(arg: str, default_parser: Callable = kv_to_map) -> Dict[str, Any]:
     if io.has_extension(arg, ".json"):
         with open(io.normalize_path(arg), encoding="utf-8") as f:
             return json.load(f)
@@ -112,15 +125,15 @@ def to_dict(arg, default_parser=kv_to_map):
         return default_parser(csv_to_list(arg))
 
 
-def bulleted_list_of(src_list):
+def bulleted_list_of(src_list: Collection[str]) -> List[str]:
     return [f"- {param}" for param in src_list]
 
 
-def double_quoted_list_of(src_list):
+def double_quoted_list_of(src_list: Collection[str]) -> List[str]:
     return [f'"{param}"' for param in src_list]
 
 
-def make_list_of_close_matches(word_list, all_possibilities):
+def make_list_of_close_matches(word_list: Collection[str], all_possibilities: Collection[str]) -> List[str]:
     """
     Returns list of closest matches for `word_list` from `all_possibilities`.
     e.g. [num_of-shards] will return [num_of_shards] when all_possibilities=["num_of_shards", "num_of_replicas"]
@@ -138,12 +151,14 @@ def make_list_of_close_matches(word_list, all_possibilities):
     return close_matches
 
 
-class ConnectOptions:
+class ConnectOptions(abc.ABC):
     """
     Base Class to help either parsing --target-hosts or --client-options
     """
 
-    def __getitem__(self, key):
+    parsed_options: Mapping[str, Mapping[str, str]]
+
+    def __getitem__(self, key: str) -> Mapping[str, str]:
         """
         Race expects the cfg object to be subscriptable
         Just return 'default'
@@ -151,12 +166,12 @@ class ConnectOptions:
         return self.default
 
     @property
-    def default(self):
+    def default(self) -> Mapping[str, Any]:
         """Return a list with the options assigned to the 'default' key"""
         return self.parsed_options["default"]
 
     @property
-    def all_options(self):
+    def all_options(self) -> Mapping[str, Mapping[str, str]]:
         """Return a dict with all parsed options"""
         return self.parsed_options
 
@@ -164,36 +179,35 @@ class ConnectOptions:
 class TargetHosts(ConnectOptions):
     DEFAULT = "default"
 
-    def __init__(self, argvalue):
+    def __init__(self, argvalue: str):
         self.argname = "--target-hosts"
         self.argvalue = argvalue
-        self.parsed_options = []
+        self.parsed_options = {}
 
         self.parse_options()
 
     @classmethod
-    def _normalize_hosts(cls, hosts):
+    def _normalize_hosts(cls, hosts: Union[str, Collection[str]]) -> Collection[Mapping[str, AnyStr]]:
         # pylint: disable=import-outside-toplevel
         from urllib.parse import unquote, urlparse
 
-        string_types = str, bytes
         # if hosts are empty, just defer to defaults down the line
         if hosts is None:
             return [{}]
 
         # passed in just one string
-        if isinstance(hosts, string_types):
+        if isinstance(hosts, str):
             hosts = [hosts]
 
         out = []
         # normalize hosts to dicts
         for host in hosts:
-            if isinstance(host, string_types):
+            if isinstance(host, str):
                 if "://" not in host:
-                    host = "//%s" % host
+                    host = f"//{host}"
 
                 parsed_url = urlparse(host)
-                h = {"host": parsed_url.hostname}
+                h: Dict[str, Any] = {"host": parsed_url.hostname}
 
                 if parsed_url.port:
                     h["port"] = parsed_url.port
@@ -204,8 +218,8 @@ class TargetHosts(ConnectOptions):
 
                 if parsed_url.username or parsed_url.password:
                     h["http_auth"] = "%s:%s" % (
-                        unquote(parsed_url.username),
-                        unquote(parsed_url.password),
+                        unquote(parsed_url.username or ""),
+                        unquote(parsed_url.password or ""),
                     )
 
                 if parsed_url.path and parsed_url.path != "/":
@@ -216,8 +230,8 @@ class TargetHosts(ConnectOptions):
                 out.append(host)
         return out
 
-    def parse_options(self):
-        def normalize_to_dict(arg):
+    def parse_options(self) -> None:
+        def normalize_to_dict(arg: str) -> Mapping[str, Collection[Mapping[str, str]]]:
             """
             Return parsed comma separated host string as dict with "default" key.
             This is needed to support backwards compatible --target-hosts for single clusters that are not
@@ -233,7 +247,7 @@ class TargetHosts(ConnectOptions):
         self.parsed_options = parsed_options
 
     @property
-    def all_hosts(self):
+    def all_hosts(self) -> Mapping[str, Mapping[str, str]]:
         """Return a dict with all parsed options"""
         return self.all_options
 
@@ -247,15 +261,15 @@ class ClientOptions(ConnectOptions):
     apply options defaults for all cluster names.
     """
 
-    def __init__(self, argvalue, target_hosts=None):
+    def __init__(self, argvalue: str, target_hosts: Optional[TargetHosts] = None):
         self.argname = "--client-options"
         self.argvalue = argvalue
         self.target_hosts = target_hosts
-        self.parsed_options = []
+        self.parsed_options = {}
 
         self.parse_options()
 
-    def parse_options(self):
+    def parse_options(self) -> None:
         default_client_map = kv_to_map([ClientOptions.DEFAULT_CLIENT_OPTIONS])
         if self.argvalue == ClientOptions.DEFAULT_CLIENT_OPTIONS and self.target_hosts is not None:
             # --client-options unset but multi-clusters used in --target-hosts? apply options defaults for all cluster names.
@@ -264,7 +278,7 @@ class ClientOptions(ConnectOptions):
             self.parsed_options = to_dict(self.argvalue, default_parser=ClientOptions.normalize_to_dict)
 
     @staticmethod
-    def normalize_to_dict(arg):
+    def normalize_to_dict(arg: Any) -> Mapping[str, Mapping[str, Any]]:
         """
         When --client-options is a non-json csv string (single cluster mode),
         return parsed client options as dict with "default" key
@@ -276,15 +290,15 @@ class ClientOptions(ConnectOptions):
         return {TargetHosts.DEFAULT: {**default_client_map, **kv_to_map(arg)}}
 
     @property
-    def all_client_options(self):
+    def all_client_options(self) -> Mapping[str, Any]:
         """Return a dict with all client options"""
         return self.all_options
 
     @property
-    def uses_static_responses(self):
+    def uses_static_responses(self) -> bool:
         return self.default.get("static_responses", False)
 
-    def with_max_connections(self, max_connections):
+    def with_max_connections(self, max_connections: int) -> Mapping[str, Any]:
         final_client_options = {}
         for cluster, original_opts in self.all_client_options.items():
             amended_opts = dict(original_opts)

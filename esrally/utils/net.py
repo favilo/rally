@@ -38,7 +38,7 @@ def __proxy_manager_from_env(env_var, logger):
         env_var = "all_proxy"
         proxy_url = os.getenv(env_var) or os.getenv(env_var.upper())
     if proxy_url and len(proxy_url) > 0:
-        parsed_url = urllib3.util.parse_url(proxy_url)
+        parsed_url: urllib3.util.Url = urllib3.util.parse_url(proxy_url)
         logger.info("Connecting via proxy URL [%s] to the Internet (picked up from the environment variable [%s]).", proxy_url, env_var)
         return urllib3.ProxyManager(
             proxy_url,
@@ -234,7 +234,7 @@ def download_http(url, local_path, expected_size_in_bytes=None, progress_indicat
 
 def add_url_param_elastic_no_kpi(url):
     scheme = urllib3.util.parse_url(url).scheme
-    if scheme.startswith("http"):
+    if scheme is not None and scheme.startswith("http"):
         return _add_url_param(url, {"x-elastic-no-kpi": "true"})
     else:
         return url
@@ -293,6 +293,7 @@ def _request(method, url, **kwargs):
         init()
     parsed_url = urllib3.util.parse_url(url)
     manager = _HTTPS if parsed_url.scheme == "https" else _HTTP
+    assert manager is not None
     return manager.request(method, url, **kwargs)
 
 
@@ -304,7 +305,7 @@ def resolve(hostname_or_ip):
     for family, _, _, _, sockaddr in addrinfo:
         # we're interested in the IPv4 address
         if family == socket.AddressFamily.AF_INET:
-            ip, _ = sockaddr
+            ip, *_ = sockaddr
             if ip[:3] != "127":
                 return ip
     return None

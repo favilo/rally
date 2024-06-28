@@ -29,9 +29,9 @@ def probed(f):
             lambda: process.run_subprocess_with_logging(f"git -C {io.escape_path(src)} --version", level=logging.DEBUG),
             quiet=True,
         ):
-            version = process.run_subprocess_with_output("git --version")
-            if version:
-                version = str(version).strip()
+            version_list = process.run_subprocess_with_output("git --version")
+            if version_list:
+                version = "".join(version_list).strip()
             else:
                 version = "Unknown"
             raise exceptions.SystemSetupError("Your git version is [%s] but Rally requires at least git 1.9. Please update git." % version)

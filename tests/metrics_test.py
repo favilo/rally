@@ -26,15 +26,18 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from unittest import mock
+from typing import Optional
 
 import elasticsearch.exceptions
 import elasticsearch.helpers
+import elastic_transport
 import pytest
 
 from esrally import config, exceptions, metrics, paths, track
 from esrally.metrics import GlobalStatsCalculator
 from esrally.track import Challenge, Operation, Task, Track
 from esrally.utils import opts
+
 
 
 class MockClientFactory:
@@ -105,8 +108,13 @@ class TestEsClient:
             self.node_pool = TestEsClient.NodePoolMock(hosts)
 
     @dataclass
-    class ApiResponseMeta:
+    class ApiResponseMeta(elastic_transport.ApiResponseMeta):
         status: int
+        # Just needed for proper type checking
+        http_version: str = ""
+        headers: elastic_transport.HttpHeaders = elastic_transport.HttpHeaders({})
+        duration: float = 0.0
+        node: Optional[elastic_transport.NodeConfig] = None
 
     class ClientMock:
         def __init__(self, hosts):
@@ -321,7 +329,8 @@ class TestEsClient:
 
     def test_raises_sytem_setup_error_on_authentication_problems(self):
         def raise_authentication_error():
-            raise elasticsearch.exceptions.AuthenticationException(meta=None, body=None, message="unit-test")
+            TEST_META = TestEsClient.ApiResponseMeta(status=0)
+            raise elasticsearch.exceptions.AuthenticationException(meta=TEST_META, body=None, message="unit-test")
 
         client = metrics.EsClient(self.ClientMock([{"host": "127.0.0.1", "port": "9243"}]))
 
@@ -334,7 +343,8 @@ class TestEsClient:
 
     def test_raises_sytem_setup_error_on_authorization_problems(self):
         def raise_authorization_error():
-            raise elasticsearch.exceptions.AuthorizationException(meta=None, body=None, message="unit-test")
+            TEST_META = TestEsClient.ApiResponseMeta(status=0)
+            raise elasticsearch.exceptions.AuthorizationException(meta=TEST_META, body=None, message="unit-test")
 
         client = metrics.EsClient(self.ClientMock([{"host": "127.0.0.1", "port": "9243"}]))
 

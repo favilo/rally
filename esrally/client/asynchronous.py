@@ -74,6 +74,7 @@ class StaticRequest(aiohttp.ClientRequest):
     RESPONSES = None
 
     async def send(self, conn: "Connection") -> "ClientResponse":
+        assert self._writer is not None
         self.response = self.response_class(
             self.method,
             self.original_url,
@@ -223,7 +224,7 @@ class RallyAiohttpHttpNode(AiohttpHttpNode):
         self._loop = None
         self.client_id = None
         self.trace_configs = None
-        self.enable_cleanup_closed = None
+        self.enable_cleanup_closed = False
         self._static_responses = None
         self._request_class = aiohttp.ClientRequest
         self._response_class = aiohttp.ClientResponse
